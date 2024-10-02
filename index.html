@@ -1,0 +1,374 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#282c34" />
+    <meta name="description" content="An easy way to process and transform data using JavaScript in the browser. Templates can be saved and shared using a self-contained link.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🔧</text></svg>">
+    <title>Transform tool</title>
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+            background-color: #282c34 !important;
+        }
+
+        .ace-tm {
+            background-color: #282c34 !important;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            display: flex;
+        }
+
+        header>div {
+            display: flex;
+            flex-direction: column;
+            min-width: 8em;
+        }
+
+        header #transformName {
+            flex: 1;
+        }
+
+        main {
+            /* display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr)); */
+            display: flex;
+            height: 100%;
+        }
+
+
+        button {
+            border: none;
+            padding: 0 0.75em;
+            background-color: #282c34;
+            border-bottom: 3px solid #434652;
+            color: #fff;
+            cursor: pointer;
+            flex: 1;
+            font-family: monospace;
+        }
+
+        button:hover {
+            background-color: #434652;
+        }
+
+        main>div {
+            flex: 1;
+            background-color: #191a1b;
+        }
+
+        header textarea {
+            border: none;
+            border-bottom: 3px solid #434652;
+            background-color: transparent;
+            padding: 0.5em;
+            color: #fff;
+            resize: vertical;
+            height: 98px;
+            min-height: 45px;
+            max-height: 40vh;
+            border-right: 3px solid #434652;
+        }
+
+        /* this is a beautiful hack */
+        header textarea:first-line {
+            font-weight: bold;
+            font-size: 1.15em;
+        }
+
+        main textarea {
+            width: 100%;
+            height: 100%;
+            resize: none;
+            border: none;
+            background-color: transparent;
+            padding: 0.5em;
+            color: #fff;
+            overflow-y: scroll;
+        }
+
+        textarea {
+            outline: none;
+        }
+
+        @media (max-width: 768px) {
+            main {
+                flex-direction: column;
+            }
+
+            main textarea {
+                resize: vertical;
+                height: 33%;
+                min-height: 50px;
+                width: 100% !important;
+                border-bottom: 4px solid #434652;
+            }
+
+            #editor {
+                min-height: 50px;
+            }
+        }
+
+        @media (min-width: 768px) {
+            main textarea {
+                resize: horizontal;
+                width: 33%;
+                min-width: 50px;
+                height: auto !important;
+                border-right: 4px solid #434652;
+            }
+
+            #editor {
+                min-width: 50px;
+            }
+        }
+
+        /* 
+        #startTransform {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+        } */
+
+        #transformIcon {
+            display: inline-block;
+            transform-origin: 9.75px 10px;
+        }
+
+        .rotate {
+            animation: rotate 0.5s ease-in-out;
+        }
+
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .ace_print-margin {
+            display: none;
+        }
+
+        ::-webkit-scrollbar {
+            width: 1.25em;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            border-radius: 20px;
+            background-clip: content-box;
+            border: 6px solid transparent;
+            background-color: rgba(210, 210, 210, 0.75);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(247, 247, 247, 0.75);
+        }
+
+        ::-webkit-scrollbar-thumb:active {
+            background-color: rgba(173, 173, 173, 0.75);
+        }
+
+        ::-webkit-resizer {
+            background-color: #282c34;
+            border-width: 8px;
+            border-style: solid;
+            border-color: transparent #434652 #434652 transparent;
+            width: 10px;
+        }
+
+        iframe {
+            display: none;
+        }
+    </style>
+    <meta name="color-scheme" content="dark light">
+</head>
+
+<body>
+    <header>
+        <textarea spellcheck="false" id="transformName" placeholder="Transform name
+
+Transform description"></textarea>
+        <div>
+            <button id="copyLink">🔗 Save link</button>
+            <button id="startTransform"><span id="transformIcon">✨</span> Transform</button>
+        </div>
+    </header>
+    <main>
+        <textarea spellcheck="false" id="input" placeholder="Input..."></textarea>
+        <textarea spellcheck="false" id="output" placeholder="Output (click the Transform button to process)" readonly></textarea>
+        <div id="editor"></div>
+    </main>
+
+    <iframe id="iframeSandbox" sandbox="allow-scripts"></iframe>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.9.6/ace.js" type="text/javascript" charset="utf-8"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.9.6/ext-language_tools.js" type="text/javascript" charset="utf-8"></script> -->
+    <script>
+        var editor = ace.edit('editor');
+        ace.require("ace/ext/language_tools");
+        editor.setTheme("ace/theme/one_dark");
+        editor.getSession().setMode("ace/mode/javascript");
+        editor.setOptions({
+            // enableBasicAutocompletion: false,
+            // enableSnippets: false,
+            // enableLiveAutocompletion: false,
+            placeholder: 'use the `input` variable and transform it with JavaScript\nthen set the output with `return value`',
+            showGutter: false,
+            indentedSoftWrap: false,
+            wrap: true,
+        });
+        editor.renderer.setPadding(10);
+        editor.renderer.setScrollMargin(10);
+
+        const triggerEditorResize = () => {
+            editor.resize();
+            editor.renderer.updateFull();
+        };
+
+        let changed = false;
+        window.onbeforeunload = () => {
+            if (changed) return 'Modifications will be lost. Click the Save link button to save changes to the URL.'
+        };
+
+        let queryParams = new URLSearchParams(location.search);
+
+        function updateQueryParam(name, value) {
+            if (value.length === 0) {
+                queryParams.delete(name);
+            } else {
+                queryParams.set(name, value);
+            }
+            history.replaceState(null, '', window.location.pathname + '?' + queryParams.toString());
+        }
+
+        const transformName = decodeURIComponent(queryParams.get('name') ?? '');
+        const transformNameEl = document.querySelector('#transformName');
+        transformNameEl.value = transformName;
+        transformNameEl.oninput = () => {
+            // updateQueryParam('name', transformNameEl.value);
+            changed = true;
+        };
+
+
+        const input = decodeURIComponent(queryParams.get('input') ?? '');
+        const inputEl = document.querySelector('#input');
+        inputEl.value = input;
+        inputEl.oninput = () => {
+            // updateQueryParam('input', inputEl.value);
+            changed = true;
+        };
+        new ResizeObserver(triggerEditorResize).observe(inputEl);
+        new ResizeObserver(triggerEditorResize).observe(document.querySelector('#output'));
+
+
+        document.querySelector('#copyLink').onclick = async () => {
+            // clear all params
+            queryParams = new URLSearchParams();
+            updateQueryParam('name', transformNameEl.value);
+            updateQueryParam('input', inputEl.value)
+            updateQueryParam('code', editor.getValue());
+            changed = false;
+            const originalLabel = document.querySelector('#copyLink').innerText;
+            try {
+                await navigator.clipboard.writeText(location.href);
+                document.querySelector('#copyLink').innerText = '✔️ URL updated';
+
+                setTimeout(() => {
+                    document.querySelector('#copyLink').innerText = '📋 Link copied';
+                }, 750);
+            } catch (err) {
+                document.querySelector('#copyLink').innerText = '❌ Failed to copy';
+            }
+
+            setTimeout(() => {
+                document.querySelector('#copyLink').innerText = originalLabel;
+            }, 1500);
+        };
+
+
+        const code = decodeURIComponent(queryParams.get('code') ?? `// multiplies number on each line by 2
+return input
+    .split('\\n')
+    .map(n=>parseInt(n)*2)
+    .join('\\n');`);
+        editor.setValue(code, 1);
+        editor.on('change', () => {
+            // updateQueryParam('code', editor.getValue());
+        });
+
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        document.querySelector('#startTransform').onclick = startTransform;
+        async function startTransform() {
+            document.querySelector('#transformIcon').classList.remove('rotate');
+            // await sleep(10);
+            try {
+                document.querySelector('#transformIcon').innerText = '✨';
+
+                const evalCode = '(async function transform(input){' + editor.getValue() + '\n})';
+                const inputValue = inputEl.value;
+
+                document.querySelector('#iframeSandbox').onload = () => {
+                    document.querySelector('#transformIcon').classList.add('rotate');
+                    document.querySelector('#iframeSandbox').contentWindow.postMessage({ code: evalCode, input: inputValue }, '*');
+
+                };
+                document.querySelector('#iframeSandbox').srcdoc = `
+<script>
+    window.addEventListener('message', async (e) => {
+        if (e.source !== parent) return;
+
+        const sendMessageBack = (message) => e.source.postMessage(message, e.origin);
+
+        try {
+            const transformFunction = eval(e.data.code);
+            const returnValue = await transformFunction(e.data.input);
+
+            sendMessageBack({
+                error: false,
+                value: returnValue,
+            });
+        } catch (e) {
+            sendMessageBack({
+                error: true,
+                value: e.message,
+            });
+        }
+    });
+<\/script>`;
+
+                // const transformFunction = eval('(async function transform(input){' + editor.getValue() + '\n})');
+                // const returnValue = await transformFunction(inputEl.value);
+                // document.querySelector('#output').value = returnValue;
+            } catch (e) {
+                document.querySelector('#transformIcon').innerText = '❌';
+                document.querySelector('#output').value = e;
+            }
+        }
+
+        window.addEventListener('message', (e) => {
+            if (e.source !== null && e.source === document.querySelector('#iframeSandbox').contentWindow) {
+                document.querySelector('#output').value = e.data.value;
+
+                if (e.data.error === true) {
+                    document.querySelector('#transformIcon').innerText = '⚠️';
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
